@@ -1,0 +1,7 @@
+{
+  "name": "Max7219Matrix",
+  "version": "0.1.0",
+  "description": "Draw pixels, bitmaps and scrolling text on chained MAX7219 8x8 LED modules",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

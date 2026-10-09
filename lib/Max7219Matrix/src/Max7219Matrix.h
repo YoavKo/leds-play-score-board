@@ -78,6 +78,18 @@ class Max7219Matrix {
   // Same, for an arbitrary string, in segment digits.
   void showSegmentText(const char* text, Align align = kRight);
 
+  // --- boards: independent groups of modules in one chain ---
+  // A "board" is `modulesPerBoard` consecutive modules (default 4 = one 32x8
+  // board), numbered from 1 starting at the left. These draw into one board
+  // only, clipped to it, leave the others untouched, and call show().
+  void setModulesPerBoard(uint8_t n) { _modulesPerBoard = n ? n : 1; }
+  uint8_t boardCount() const { return _n / _modulesPerBoard; }
+  // Shows `value` on `board` using the current font, zero-padded to
+  // `minDigits` (0 = no padding). e.g. setBoardNumber(2, 42, 4) -> "0042".
+  void setBoardNumber(uint8_t board, long value, uint8_t minDigits = 0,
+                      Align align = kCenter);
+  void setBoardText(uint8_t board, const char* text, Align align = kCenter);
+
   // --- scrolling text (non-blocking) ---
   // Call update() from loop(); it redraws + shows when the step interval has
   // elapsed. Returns true while the scroll is still running.
@@ -94,6 +106,7 @@ class Max7219Matrix {
 
  private:
   void sendAll(uint8_t reg, uint8_t value);
+  int16_t fontTopY() const { return _font == kFont3x5 ? 1 : 0; }
   uint8_t nativeByte(uint8_t logicalModule, uint8_t reg) const;
 
   uint8_t _cs;
@@ -112,5 +125,9 @@ class Max7219Matrix {
   ScrollDir _scrollDir = kScrollLeft;
   bool _scrolling = false;
   Font _font = kFont5x7;
+  uint8_t _modulesPerBoard = 4;
+  // Drawing is clipped to columns [_clipL, _clipR); whole display by default.
+  int16_t _clipL = 0;
+  int16_t _clipR = 0;  // 0 = _width, set in the constructor
   uint32_t _lastStep = 0;
 };

@@ -18,7 +18,8 @@ Max7219Matrix::Max7219Matrix(uint8_t csPin, uint8_t numModules, uint8_t layout)
     : _cs(csPin),
       _n(min<uint8_t>(numModules, kMaxModules)),
       _layout(layout),
-      _width(_n * 8) {}
+      _width(_n * 8),
+      _clipR(_width) {}
 
 void Max7219Matrix::begin(SPIClass& spi, uint8_t brightness) {
   _spi = &spi;
@@ -54,7 +55,7 @@ void Max7219Matrix::sendAll(uint8_t reg, uint8_t value) {
 void Max7219Matrix::clear() { memset(_fb, 0, sizeof(_fb)); }
 
 void Max7219Matrix::setPixel(int16_t x, int16_t y, bool on) {
-  if (x < 0 || x >= _width || y < 0 || y >= 8) return;
+  if (x < _clipL || x >= _clipR || y < 0 || y >= 8) return;
   if (on)
     _fb[x] |= (1 << y);
   else
@@ -118,7 +119,7 @@ uint8_t Max7219Matrix::drawChar(int16_t x, int16_t y, char c) {
 
 int16_t Max7219Matrix::drawText(int16_t x, int16_t y, const char* text) {
   for (; *text; text++) {
-    if (x >= (int16_t)_width) break;  // fully off the right edge
+    if (x >= _clipR) break;  // fully off the right edge
     x += drawChar(x, y, *text);
   }
   return x;
@@ -209,6 +210,33 @@ void Max7219Matrix::showNumber(long value, Align align) {
   showSegmentText(buf, align);
 }
 
+void Max7219Matrix::setBoardText(uint8_t board, const char* text, Align align) {
+  if (board < 1 || board > boardCount()) return;
+  const int16_t left = (board - 1) * _modulesPerBoard * 8;
+  const int16_t w = _modulesPerBoard * 8;
+
+  _clipL = left;
+  _clipR = left + w;
+  for (int16_t x = _clipL; x < _clipR; x++) _fb[x] = 0;
+
+  const int16_t tw = textWidth(text);
+  int16_t x = left;
+  if (align == kRight) x = left + w - tw;
+  else if (align == kCenter) x = left + (w - tw) / 2;
+  drawText(x, fontTopY(), text);
+
+  _clipL = 0;
+  _clipR = _width;
+  show();
+}
+
+void Max7219Matrix::setBoardNumber(uint8_t board, long value, uint8_t minDigits,
+                                   Align align) {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%0*ld", (int)min<uint8_t>(minDigits, 11), value);
+  setBoardText(board, buf, align);
+}
+
 void Max7219Matrix::startScroll(const String& text, uint16_t stepMs, bool loop,
                                 ScrollDir dir) {
   _scrollText = text;
@@ -228,7 +256,7 @@ bool Max7219Matrix::update() {
   _lastStep = now;
 
   clear();
-  drawText(_scrollX, _font == kFont3x5 ? 1 : 0, _scrollText.c_str());
+  drawText(_scrollX, fontTopY(), _scrollText.c_str());
   show();
 
   const bool done = (_scrollDir == kScrollLeft) ? (--_scrollX < -_scrollW)
